@@ -1,6 +1,6 @@
 {
-  "name": "和英練習プレイヤー",
-  "short_name": "和英練習",
+  "name": "和英練習プレイヤー 音声CSV版",
+  "short_name": "和英音声CSV",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#f3f6fb",

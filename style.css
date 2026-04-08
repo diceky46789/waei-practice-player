@@ -1,7 +1,7 @@
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f3f6fb; color: #18212f; }
 body { min-height: 100vh; }
-.app { max-width: 920px; margin: 0 auto; padding: 16px; }
+.app { max-width: 940px; margin: 0 auto; padding: 16px; }
 .topbar { position: sticky; top: 0; z-index: 10; background: #f3f6fb; padding-bottom: 8px; }
 h1 { margin: 0 0 12px; font-size: 28px; }
 h2 { margin-top: 0; font-size: 20px; }
@@ -69,6 +69,7 @@ button.ghost { background: transparent; }
   border: 1px solid #efb4b4; background: #fff6f6; color: #9f1d1d;
   border-radius: 12px; padding: 8px 12px; cursor: pointer;
 }
+.audio-status-wrap { display: grid; gap: 4px; margin-top: 10px; }
 @media (max-width: 720px) {
   .app { padding: 12px; }
   h1 { font-size: 22px; }

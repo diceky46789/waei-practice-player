@@ -1,4 +1,4 @@
-const CACHE_NAME = 'waei-player-v2';
+const CACHE_NAME = 'waei-player-v3';
 const ASSETS = [
   './',
   './index.html',

@@ -13,16 +13,22 @@ const DEFAULT_SETTINGS = {
   repeatMode: false,
   hideEnglishInitially: true,
   showExplanation: true,
-  backgroundMode: true
+  preferAudioFiles: true,
+  fallbackToSpeech: true
 };
 
-const SAMPLE_CSV_URL = 'problems.csv';
 const SAMPLE_DATASET_ID = 'sample_builtin';
+const SAMPLE_CSV_URL = 'problems.csv';
+const DB_NAME = 'waei_audio_app_db';
+const DB_VERSION = 1;
+const DATASET_STORE = 'datasets';
+const AUDIO_STORE = 'audioFiles';
 
+let db = null;
 let settings = loadSettings();
-let datasetStore = loadDatasetStore();
 let activeDatasetId = loadActiveDatasetId();
 let problems = [];
+let currentDataset = null;
 let displayOrder = [];
 let currentOrderIndex = 0;
 let isPlaying = false;
@@ -30,7 +36,7 @@ let isPaused = false;
 let revealed = false;
 let activeTimeout = null;
 let countdownInterval = null;
-let wakeLock = null;
+let currentAudio = null;
 
 const els = {
   screenPractice: document.getElementById('screenPractice'),
@@ -48,6 +54,8 @@ const els = {
   jpText: document.getElementById('jpText'),
   enText: document.getElementById('enText'),
   exText: document.getElementById('exText'),
+  jpAudioStatus: document.getElementById('jpAudioStatus'),
+  enAudioStatus: document.getElementById('enAudioStatus'),
   countdownNumber: document.getElementById('countdownNumber'),
   countdownLabel: document.getElementById('countdownLabel'),
   playBtn: document.getElementById('playBtn'),
@@ -60,7 +68,7 @@ const els = {
   searchInput: document.getElementById('searchInput'),
   clearSearchBtn: document.getElementById('clearSearchBtn'),
   problemList: document.getElementById('problemList'),
-  csvFileInput: document.getElementById('csvFileInput'),
+  datasetFileInput: document.getElementById('datasetFileInput'),
   loadSampleBtn: document.getElementById('loadSampleBtn'),
   saveSettingsBtn: document.getElementById('saveSettingsBtn'),
   resetSettingsBtn: document.getElementById('resetSettingsBtn'),
@@ -78,12 +86,13 @@ const els = {
   repeatMode: document.getElementById('repeatMode'),
   hideEnglishInitially: document.getElementById('hideEnglishInitially'),
   showExplanation: document.getElementById('showExplanation'),
-  backgroundMode: document.getElementById('backgroundMode')
+  preferAudioFiles: document.getElementById('preferAudioFiles'),
+  fallbackToSpeech: document.getElementById('fallbackToSpeech')
 };
 
 function loadSettings() {
   try {
-    const saved = JSON.parse(localStorage.getItem('waei_settings') || '{}');
+    const saved = JSON.parse(localStorage.getItem('waei_settings_v3') || '{}');
     return { ...DEFAULT_SETTINGS, ...saved };
   } catch {
     return { ...DEFAULT_SETTINGS };
@@ -91,28 +100,15 @@ function loadSettings() {
 }
 
 function saveSettings() {
-  localStorage.setItem('waei_settings', JSON.stringify(settings));
-}
-
-function loadDatasetStore() {
-  try {
-    const saved = JSON.parse(localStorage.getItem('waei_dataset_store') || '{}');
-    return saved && typeof saved === 'object' ? saved : {};
-  } catch {
-    return {};
-  }
-}
-
-function saveDatasetStore() {
-  localStorage.setItem('waei_dataset_store', JSON.stringify(datasetStore));
+  localStorage.setItem('waei_settings_v3', JSON.stringify(settings));
 }
 
 function loadActiveDatasetId() {
-  return localStorage.getItem('waei_active_dataset_id') || SAMPLE_DATASET_ID;
+  return localStorage.getItem('waei_active_dataset_id_v3') || SAMPLE_DATASET_ID;
 }
 
 function saveActiveDatasetId() {
-  localStorage.setItem('waei_active_dataset_id', activeDatasetId);
+  localStorage.setItem('waei_active_dataset_id_v3', activeDatasetId);
 }
 
 function applySettingsToForm() {
@@ -142,7 +138,8 @@ function readSettingsFromForm() {
     repeatMode: els.repeatMode.checked,
     hideEnglishInitially: els.hideEnglishInitially.checked,
     showExplanation: els.showExplanation.checked,
-    backgroundMode: els.backgroundMode.checked
+    preferAudioFiles: els.preferAudioFiles.checked,
+    fallbackToSpeech: els.fallbackToSpeech.checked
   };
   saveSettings();
   applySettingsToForm();
@@ -172,6 +169,83 @@ function switchTab(tab) {
   [els.tabPractice, els.tabList, els.tabSettings].forEach(b => b.classList.remove('active'));
   mapping[tab][0].classList.add('active');
   mapping[tab][1].classList.add('active');
+}
+
+function openDb() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onupgradeneeded = (event) => {
+      const db = event.target.result;
+      if (!db.objectStoreNames.contains(DATASET_STORE)) {
+        db.createObjectStore(DATASET_STORE, { keyPath: 'id' });
+      }
+      if (!db.objectStoreNames.contains(AUDIO_STORE)) {
+        db.createObjectStore(AUDIO_STORE, { keyPath: 'key' });
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+function tx(storeName, mode='readonly') {
+  return db.transaction(storeName, mode).objectStore(storeName);
+}
+
+function getAllDatasets() {
+  return new Promise((resolve, reject) => {
+    const req = tx(DATASET_STORE).getAll();
+    req.onsuccess = () => resolve(req.result || []);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+function getDataset(id) {
+  return new Promise((resolve, reject) => {
+    const req = tx(DATASET_STORE).get(id);
+    req.onsuccess = () => resolve(req.result || null);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+function putDataset(dataset) {
+  return new Promise((resolve, reject) => {
+    const req = tx(DATASET_STORE, 'readwrite').put(dataset);
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+  });
+}
+
+function deleteDatasetRecord(id) {
+  return new Promise((resolve, reject) => {
+    const req = tx(DATASET_STORE, 'readwrite').delete(id);
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+  });
+}
+
+function putAudioBlob(key, blob) {
+  return new Promise((resolve, reject) => {
+    const req = tx(AUDIO_STORE, 'readwrite').put({ key, blob });
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+  });
+}
+
+function getAudioBlob(key) {
+  return new Promise((resolve, reject) => {
+    const req = tx(AUDIO_STORE).get(key);
+    req.onsuccess = () => resolve(req.result ? req.result.blob : null);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+function deleteAudioBlob(key) {
+  return new Promise((resolve, reject) => {
+    const req = tx(AUDIO_STORE, 'readwrite').delete(key);
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+  });
 }
 
 function csvToProblems(text) {
@@ -209,6 +283,8 @@ function csvToProblems(text) {
       jp: item.jp || '',
       en: item.en || '',
       ex: item.ex || '',
+      jpAudio: item.jpAudio || '',
+      enAudio: item.enAudio || '',
       status: '未記録'
     };
   }).filter(p => p.jp || p.en);
@@ -216,83 +292,6 @@ function csvToProblems(text) {
 
 function datasetDisplayName(ds) {
   return ds?.name || '無題';
-}
-
-function setActiveDataset(id) {
-  if (!datasetStore[id]) return;
-  stopPlayback();
-  activeDatasetId = id;
-  saveActiveDatasetId();
-  problems = datasetStore[id].problems || [];
-  currentOrderIndex = 0;
-  buildDisplayOrder();
-  renderDatasetButtons();
-  renderDatasetManager();
-  renderCurrentProblem();
-  renderList(els.searchInput ? els.searchInput.value : '');
-}
-
-function addDataset(name, problemsArray) {
-  const id = 'ds_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
-  datasetStore[id] = {
-    id,
-    name,
-    problems: problemsArray,
-    createdAt: new Date().toISOString()
-  };
-  saveDatasetStore();
-  setActiveDataset(id);
-}
-
-function deleteDataset(id) {
-  if (id === SAMPLE_DATASET_ID) {
-    alert('内蔵サンプルは削除できません。');
-    return;
-  }
-  if (!datasetStore[id]) return;
-  delete datasetStore[id];
-  saveDatasetStore();
-  if (activeDatasetId === id) {
-    setActiveDataset(SAMPLE_DATASET_ID);
-  } else {
-    renderDatasetButtons();
-    renderDatasetManager();
-  }
-}
-
-function renderDatasetButtons() {
-  [els.datasetButtonsPractice, els.datasetButtonsList].forEach(container => {
-    if (!container) return;
-    container.innerHTML = '';
-    Object.values(datasetStore).forEach(ds => {
-      const btn = document.createElement('button');
-      btn.className = 'dataset-btn' + (ds.id === activeDatasetId ? ' active' : '');
-      btn.textContent = `${datasetDisplayName(ds)} (${(ds.problems || []).length})`;
-      btn.addEventListener('click', () => setActiveDataset(ds.id));
-      container.appendChild(btn);
-    });
-  });
-}
-
-function renderDatasetManager() {
-  if (!els.datasetManager) return;
-  els.datasetManager.innerHTML = '';
-  Object.values(datasetStore).forEach(ds => {
-    const row = document.createElement('div');
-    row.className = 'dataset-row';
-    const sub = ds.id === SAMPLE_DATASET_ID ? '内蔵サンプル' : `問題数: ${(ds.problems || []).length}`;
-    row.innerHTML = `
-      <div class="dataset-meta">
-        <div class="dataset-name">${escapeHtml(datasetDisplayName(ds))}</div>
-        <div class="dataset-sub">${escapeHtml(sub)}</div>
-      </div>
-      <div class="row gap wrap">
-        <button data-activate="${ds.id}" class="${ds.id === activeDatasetId ? 'primary' : ''}">この問題集を使う</button>
-        ${ds.id === SAMPLE_DATASET_ID ? '' : `<button data-delete="${ds.id}" class="danger-btn">削除</button>`}
-      </div>
-    `;
-    els.datasetManager.appendChild(row);
-  });
 }
 
 function buildDisplayOrder() {
@@ -316,14 +315,95 @@ function updatePhase(label) {
   els.phaseBadge.textContent = label;
 }
 
+function escapeHtml(str) {
+  return (str || '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
+}
+
+async function setActiveDataset(id) {
+  const ds = await getDataset(id);
+  if (!ds) return;
+  stopPlayback();
+  activeDatasetId = id;
+  saveActiveDatasetId();
+  currentDataset = ds;
+  problems = ds.problems || [];
+  currentOrderIndex = 0;
+  buildDisplayOrder();
+  await renderDatasetButtons();
+  await renderDatasetManager();
+  renderCurrentProblem();
+  renderList(els.searchInput ? els.searchInput.value : '');
+}
+
+async function deleteDataset(id) {
+  if (id === SAMPLE_DATASET_ID) {
+    alert('内蔵サンプルは削除できません。');
+    return;
+  }
+  const ds = await getDataset(id);
+  if (!ds) return;
+  if (Array.isArray(ds.audioKeys)) {
+    for (const key of ds.audioKeys) {
+      await deleteAudioBlob(key);
+    }
+  }
+  await deleteDatasetRecord(id);
+  if (activeDatasetId === id) {
+    await setActiveDataset(SAMPLE_DATASET_ID);
+  } else {
+    await renderDatasetButtons();
+    await renderDatasetManager();
+  }
+}
+
+async function renderDatasetButtons() {
+  const datasets = await getAllDatasets();
+  [els.datasetButtonsPractice, els.datasetButtonsList].forEach(container => {
+    if (!container) return;
+    container.innerHTML = '';
+    datasets.forEach(ds => {
+      const btn = document.createElement('button');
+      btn.className = 'dataset-btn' + (ds.id === activeDatasetId ? ' active' : '');
+      btn.textContent = `${datasetDisplayName(ds)} (${(ds.problems || []).length})`;
+      btn.addEventListener('click', () => setActiveDataset(ds.id));
+      container.appendChild(btn);
+    });
+  });
+}
+
+async function renderDatasetManager() {
+  const datasets = await getAllDatasets();
+  els.datasetManager.innerHTML = '';
+  datasets.forEach(ds => {
+    const row = document.createElement('div');
+    row.className = 'dataset-row';
+    const sub = ds.id === SAMPLE_DATASET_ID
+      ? '内蔵サンプル'
+      : `問題数: ${(ds.problems || []).length} / 音声数: ${(ds.audioKeys || []).length}`;
+    row.innerHTML = `
+      <div class="dataset-meta">
+        <div class="dataset-name">${escapeHtml(datasetDisplayName(ds))}</div>
+        <div class="dataset-sub">${escapeHtml(sub)}</div>
+      </div>
+      <div class="row gap wrap">
+        <button data-activate="${ds.id}" class="${ds.id === activeDatasetId ? 'primary' : ''}">この問題集を使う</button>
+        ${ds.id === SAMPLE_DATASET_ID ? '' : `<button data-delete="${ds.id}" class="danger-btn">削除</button>`}
+      </div>
+    `;
+    els.datasetManager.appendChild(row);
+  });
+}
+
 function renderCurrentProblem() {
   const p = currentProblem();
   if (!p) {
-    els.jpText.textContent = '問題がありません。設定画面からCSVを追加してください。';
+    els.jpText.textContent = '問題がありません。設定画面からCSVと音声ファイルを追加してください。';
     els.enText.textContent = '';
     els.exText.textContent = '';
     els.progressText.textContent = '問題 0 / 0';
     els.progressBar.style.width = '0%';
+    els.jpAudioStatus.textContent = '日本語音声: -';
+    els.enAudioStatus.textContent = '英語音声: -';
     updatePhase('待機中');
     return;
   }
@@ -333,6 +413,8 @@ function renderCurrentProblem() {
   revealed = !settings.hideEnglishInitially;
   renderEnglish();
   els.exText.textContent = settings.showExplanation ? (p.ex || '') : '非表示';
+  els.jpAudioStatus.textContent = `日本語音声: ${p.jpAudio || 'なし'}`;
+  els.enAudioStatus.textContent = `英語音声: ${p.enAudio || 'なし'}`;
 }
 
 function renderEnglish() {
@@ -362,6 +444,8 @@ function renderList(filter = '') {
       </div>
       <div class="list-item-jp">${escapeHtml(p.jp)}</div>
       <div class="list-item-en">${escapeHtml(p.en)}</div>
+      <div class="small-note">日本語音声: ${escapeHtml(p.jpAudio || 'なし')}</div>
+      <div class="small-note">英語音声: ${escapeHtml(p.enAudio || 'なし')}</div>
       <div class="row gap wrap" style="margin-top:10px;">
         <button data-jump="${idx}">この問題へ</button>
         <button data-status="${idx}:できた">できた</button>
@@ -371,10 +455,6 @@ function renderList(filter = '') {
     `;
     els.problemList.appendChild(item);
   });
-}
-
-function escapeHtml(str) {
-  return (str || '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
 }
 
 function sleep(ms) {
@@ -428,11 +508,60 @@ async function speak(text, langPrefix) {
   });
 }
 
-async function speakRepeated(text, langPrefix, times, gapSec) {
+function normalizeFileName(name) {
+  return (name || '').trim().toLowerCase();
+}
+
+async function playAudioBlob(blob) {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(blob);
+    currentAudio = new Audio(url);
+    currentAudio.preload = 'auto';
+    currentAudio.playbackRate = settings.speechRate;
+    currentAudio.onended = () => {
+      URL.revokeObjectURL(url);
+      currentAudio = null;
+      resolve();
+    };
+    currentAudio.onerror = () => {
+      URL.revokeObjectURL(url);
+      currentAudio = null;
+      resolve();
+    };
+    currentAudio.play().catch(() => {
+      URL.revokeObjectURL(url);
+      currentAudio = null;
+      resolve();
+    });
+  });
+}
+
+async function playNamedAudio(fileName) {
+  if (!currentDataset || !fileName) return false;
+  const key = `${currentDataset.id}::${normalizeFileName(fileName)}`;
+  const blob = await getAudioBlob(key);
+  if (!blob) return false;
+  await playAudioBlob(blob);
+  return true;
+}
+
+async function speakOrPlay(fileName, text, langPrefix) {
+  let done = false;
+  if (settings.preferAudioFiles && fileName) {
+    done = await playNamedAudio(fileName);
+  }
+  if (!done && settings.fallbackToSpeech && text) {
+    await speak(text, langPrefix);
+    done = true;
+  }
+  return done;
+}
+
+async function speakOrPlayRepeated(fileName, text, langPrefix, times, gapSec) {
   for (let i = 0; i < times; i++) {
     if (!isPlaying || isPaused) break;
-    await speak(text, langPrefix);
-    if (i < times - 1 && gapSec > 0) await countdown(gapSec, '英語の間');
+    await speakOrPlay(fileName, text, langPrefix);
+    if (i < times - 1 && gapSec > 0) await countdown(gapSec, '音声の間');
   }
 }
 
@@ -440,31 +569,14 @@ async function replayJapaneseOnly() {
   const p = currentProblem();
   if (!p || !settings.readJp) return;
   updatePhase('日本語再生');
-  await speakRepeated(p.jp, 'ja', settings.jpRepeat, 0);
+  await speakOrPlayRepeated(p.jpAudio, p.jp, 'ja', settings.jpRepeat, 0);
   updatePhase(isPlaying ? '進行中' : '停止中');
-}
-
-async function ensureWakeLock() {
-  if (!settings.backgroundMode) return;
-  try {
-    if ('wakeLock' in navigator && document.visibilityState === 'visible') {
-      wakeLock = await navigator.wakeLock.request('screen');
-    }
-  } catch {}
-}
-
-function releaseWakeLock() {
-  try {
-    if (wakeLock) wakeLock.release();
-  } catch {}
-  wakeLock = null;
 }
 
 async function playSequence() {
   if (!problems.length) return;
   isPlaying = true;
   isPaused = false;
-  await ensureWakeLock();
 
   while (isPlaying && !isPaused) {
     const p = currentProblem();
@@ -474,7 +586,7 @@ async function playSequence() {
 
     if (settings.readJp) {
       updatePhase('日本語再生');
-      await speakRepeated(p.jp, 'ja', settings.jpRepeat, 0);
+      await speakOrPlayRepeated(p.jpAudio, p.jp, 'ja', settings.jpRepeat, 0);
       if (!isPlaying || isPaused) break;
     }
 
@@ -491,7 +603,7 @@ async function playSequence() {
 
     if (settings.readEn) {
       updatePhase('英語再生');
-      await speakRepeated(p.en, 'en', settings.enRepeat, settings.enGapSec);
+      await speakOrPlayRepeated(p.enAudio, p.en, 'en', settings.enRepeat, settings.enGapSec);
       if (!isPlaying || isPaused) break;
     }
 
@@ -515,7 +627,10 @@ function stopPlayback() {
   isPaused = false;
   clearTimers();
   speechSynthesis.cancel();
-  releaseWakeLock();
+  if (currentAudio) {
+    try { currentAudio.pause(); } catch {}
+    currentAudio = null;
+  }
   updatePhase('停止中');
   els.countdownNumber.textContent = '-';
   els.countdownLabel.textContent = '待機中';
@@ -526,7 +641,10 @@ function pausePlayback() {
   isPaused = true;
   clearTimers();
   speechSynthesis.cancel();
-  releaseWakeLock();
+  if (currentAudio) {
+    try { currentAudio.pause(); } catch {}
+    currentAudio = null;
+  }
   updatePhase('一時停止');
   els.countdownLabel.textContent = '一時停止中';
 }
@@ -547,29 +665,62 @@ function movePrevInternal() {
   return false;
 }
 
+async function saveImportedDataset(csvFile, audioFiles) {
+  const text = await csvFile.text();
+  const parsed = csvToProblems(text);
+  if (!parsed.length) {
+    alert(`「${csvFile.name}」を読み込めませんでした。1行目に jp,en,ex,jpAudio,enAudio があるか確認してください。`);
+    return;
+  }
+
+  const datasetId = 'ds_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+  const audioKeys = [];
+  for (const file of audioFiles) {
+    const key = `${datasetId}::${normalizeFileName(file.name)}`;
+    await putAudioBlob(key, file);
+    audioKeys.push(key);
+  }
+
+  await putDataset({
+    id: datasetId,
+    name: csvFile.name.replace(/\.csv$/i, ''),
+    problems: parsed,
+    audioKeys,
+    createdAt: new Date().toISOString()
+  });
+
+  await setActiveDataset(datasetId);
+}
+
+async function importFiles(files) {
+  const csvFiles = files.filter(f => f.name.toLowerCase().endsWith('.csv'));
+  const audioFiles = files.filter(f => !f.name.toLowerCase().endsWith('.csv'));
+  if (!csvFiles.length) {
+    alert('CSVファイルを含めてください。');
+    return;
+  }
+  for (const csvFile of csvFiles) {
+    await saveImportedDataset(csvFile, audioFiles);
+  }
+  await renderDatasetButtons();
+  await renderDatasetManager();
+  renderCurrentProblem();
+  renderList();
+}
+
 async function loadSampleDataset() {
+  const existing = await getDataset(SAMPLE_DATASET_ID);
+  if (existing) return;
   const res = await fetch(SAMPLE_CSV_URL);
   const text = await res.text();
   const parsed = csvToProblems(text);
-  datasetStore[SAMPLE_DATASET_ID] = {
+  await putDataset({
     id: SAMPLE_DATASET_ID,
     name: '内蔵サンプル',
     problems: parsed,
+    audioKeys: [],
     createdAt: new Date().toISOString()
-  };
-  saveDatasetStore();
-  if (!activeDatasetId || !datasetStore[activeDatasetId]) activeDatasetId = SAMPLE_DATASET_ID;
-  saveActiveDatasetId();
-}
-
-async function addCsvTextAsDataset(name, text) {
-  const parsed = csvToProblems(text);
-  if (!parsed.length) {
-    alert(`「${name}」を読み込めませんでした。1行目に jp,en,ex があるか確認してください。`);
-    return false;
-  }
-  addDataset(name.replace(/\.csv$/i, ''), parsed);
-  return true;
+  });
 }
 
 function bindEvents() {
@@ -617,7 +768,7 @@ function bindEvents() {
     renderList();
   });
 
-  els.problemList.addEventListener('click', (e) => {
+  els.problemList.addEventListener('click', async (e) => {
     const jump = e.target.getAttribute('data-jump');
     const status = e.target.getAttribute('data-status');
 
@@ -630,32 +781,23 @@ function bindEvents() {
       switchTab('practice');
     }
 
-    if (status) {
+    if (status && currentDataset) {
       const [idx, value] = status.split(':');
       problems[Number(idx)].status = value;
-      datasetStore[activeDatasetId].problems = problems;
-      saveDatasetStore();
+      currentDataset.problems = problems;
+      await putDataset(currentDataset);
       renderList(els.searchInput.value);
     }
   });
 
-  els.csvFileInput.addEventListener('change', async (e) => {
+  els.datasetFileInput.addEventListener('change', async (e) => {
     const files = Array.from(e.target.files || []);
-    for (const file of files) {
-      const text = await file.text();
-      await addCsvTextAsDataset(file.name, text);
-    }
-    renderDatasetButtons();
-    renderDatasetManager();
-    renderCurrentProblem();
-    renderList();
-    els.csvFileInput.value = '';
+    await importFiles(files);
+    els.datasetFileInput.value = '';
   });
 
   els.loadSampleBtn.addEventListener('click', async () => {
-    activeDatasetId = SAMPLE_DATASET_ID;
-    saveActiveDatasetId();
-    setActiveDataset(SAMPLE_DATASET_ID);
+    await setActiveDataset(SAMPLE_DATASET_ID);
     switchTab('practice');
   });
 
@@ -673,64 +815,36 @@ function bindEvents() {
     alert('初期値に戻しました。');
   });
 
-  els.datasetManager.addEventListener('click', (e) => {
+  els.datasetManager.addEventListener('click', async (e) => {
     const activate = e.target.getAttribute('data-activate');
     const del = e.target.getAttribute('data-delete');
     if (activate) {
-      setActiveDataset(activate);
+      await setActiveDataset(activate);
       switchTab('practice');
     }
     if (del) {
-      deleteDataset(del);
-    }
-  });
-
-  document.addEventListener('visibilitychange', async () => {
-    if (document.visibilityState === 'visible') {
-      await ensureWakeLock();
+      await deleteDataset(del);
     }
   });
 
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./service-worker.js').catch(() => {});
   }
-
-  if ('mediaSession' in navigator) {
-    navigator.mediaSession.metadata = new MediaMetadata({
-      title: '和英練習プレイヤー',
-      artist: 'ChatGPT sample app'
-    });
-    navigator.mediaSession.setActionHandler('play', async () => {
-      if (!isPlaying) await playSequence();
-    });
-    navigator.mediaSession.setActionHandler('pause', () => pausePlayback());
-    navigator.mediaSession.setActionHandler('nexttrack', () => {
-      stopPlayback();
-      moveNextInternal();
-      renderCurrentProblem();
-    });
-    navigator.mediaSession.setActionHandler('previoustrack', () => {
-      stopPlayback();
-      movePrevInternal();
-      renderCurrentProblem();
-    });
-  }
 }
 
 async function init() {
+  db = await openDb();
   applySettingsToForm();
   bindEvents();
   await loadSampleDataset();
-  if (!datasetStore[activeDatasetId]) {
+
+  const active = await getDataset(activeDatasetId);
+  if (!active) {
     activeDatasetId = SAMPLE_DATASET_ID;
     saveActiveDatasetId();
   }
-  problems = datasetStore[activeDatasetId].problems || [];
-  buildDisplayOrder();
-  renderDatasetButtons();
-  renderDatasetManager();
-  renderCurrentProblem();
-  renderList();
+  await setActiveDataset(activeDatasetId);
+
   speechSynthesis.getVoices();
 }
 
