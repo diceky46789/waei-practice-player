@@ -14,7 +14,8 @@ const DEFAULT_SETTINGS = {
   hideEnglishInitially: true,
   showExplanation: true,
   preferAudioFiles: true,
-  fallbackToSpeech: true
+  fallbackToSpeech: true,
+  perQuestionRepeat: 1
 };
 
 const SAMPLE_DATASET_ID = 'sample_builtin';
@@ -87,7 +88,8 @@ const els = {
   hideEnglishInitially: document.getElementById('hideEnglishInitially'),
   showExplanation: document.getElementById('showExplanation'),
   preferAudioFiles: document.getElementById('preferAudioFiles'),
-  fallbackToSpeech: document.getElementById('fallbackToSpeech')
+  fallbackToSpeech: document.getElementById('fallbackToSpeech'),
+  perQuestionRepeat: document.getElementById('perQuestionRepeat')
 };
 
 function loadSettings() {
@@ -139,7 +141,8 @@ function readSettingsFromForm() {
     hideEnglishInitially: els.hideEnglishInitially.checked,
     showExplanation: els.showExplanation.checked,
     preferAudioFiles: els.preferAudioFiles.checked,
-    fallbackToSpeech: els.fallbackToSpeech.checked
+    fallbackToSpeech: els.fallbackToSpeech.checked,
+    perQuestionRepeat: clampInt(els.perQuestionRepeat.value, 1, 20, 1)
   };
   saveSettings();
   applySettingsToForm();
@@ -582,30 +585,44 @@ async function playSequence() {
     const p = currentProblem();
     if (!p) break;
 
-    renderCurrentProblem();
+    const repeatCount = Math.max(1, Number(settings.perQuestionRepeat) || 1);
 
-    if (settings.readJp) {
-      updatePhase('日本語再生');
-      await speakOrPlayRepeated(p.jpAudio, p.jp, 'ja', settings.jpRepeat, 0);
+    for (let repeatIndex = 0; repeatIndex < repeatCount; repeatIndex++) {
       if (!isPlaying || isPaused) break;
+
+      renderCurrentProblem();
+
+      if (settings.readJp) {
+        updatePhase(`日本語再生 ${repeatIndex + 1}/${repeatCount}`);
+        await speakOrPlayRepeated(p.jpAudio, p.jp, 'ja', settings.jpRepeat, 0);
+        if (!isPlaying || isPaused) break;
+      }
+
+      updatePhase(`考える時間 ${repeatIndex + 1}/${repeatCount}`);
+      await countdown(settings.thinkingSec, '英作文を考える');
+      if (!isPlaying || isPaused) break;
+
+      updatePhase(`発話時間 ${repeatIndex + 1}/${repeatCount}`);
+      await countdown(settings.speakingSec, '声に出す');
+      if (!isPlaying || isPaused) break;
+
+      revealed = true;
+      renderEnglish();
+
+      if (settings.readEn) {
+        updatePhase(`英語再生 ${repeatIndex + 1}/${repeatCount}`);
+        await speakOrPlayRepeated(p.enAudio, p.en, 'en', settings.enRepeat, settings.enGapSec);
+        if (!isPlaying || isPaused) break;
+      }
+
+      if (repeatIndex < repeatCount - 1) {
+        updatePhase(`同じ問題を繰り返し ${repeatIndex + 1}/${repeatCount}`);
+        await countdown(settings.nextDelaySec, '同じ問題をもう一度');
+        if (!isPlaying || isPaused) break;
+      }
     }
 
-    updatePhase('考える時間');
-    await countdown(settings.thinkingSec, '英作文を考える');
     if (!isPlaying || isPaused) break;
-
-    updatePhase('発話時間');
-    await countdown(settings.speakingSec, '声に出す');
-    if (!isPlaying || isPaused) break;
-
-    revealed = true;
-    renderEnglish();
-
-    if (settings.readEn) {
-      updatePhase('英語再生');
-      await speakOrPlayRepeated(p.enAudio, p.en, 'en', settings.enRepeat, settings.enGapSec);
-      if (!isPlaying || isPaused) break;
-    }
 
     updatePhase('次の問題へ');
     await countdown(settings.nextDelaySec, '次の問題まで');
