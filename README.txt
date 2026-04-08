@@ -4,4 +4,4 @@ CSV列: jp,en,ex,jpAudio,enAudio
 CSVの jpAudio / enAudio には音声ファイル名を入れてください。
 例: jp001.mp3 / en001.mp3
 
-各問題の自動リピート回数を設定できます。
+設定タブに「各問題の自動リピート回数」を追加しました。
