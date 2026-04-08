@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#2563eb" />
+  <title>和英練習プレイヤー</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <h1>和英練習プレイヤー</h1>
+      <div class="top-actions">
+        <button id="tabPractice" class="tab-btn active">練習</button>
+        <button id="tabList" class="tab-btn">問題一覧</button>
+        <button id="tabSettings" class="tab-btn">設定</button>
+      </div>
+    </header>
+
+    <main>
+      <section id="screenPractice" class="screen active">
+        <div class="card progress-card">
+          <div class="row space-between">
+            <div id="progressText">問題 1 / 1</div>
+            <div id="phaseBadge" class="badge">停止中</div>
+          </div>
+          <div class="progress-wrap">
+            <div id="progressBar" class="progress-bar"></div>
+          </div>
+        </div>
+
+        <div class="card sentence-card">
+          <div class="label">日本語</div>
+          <div id="jpText" class="jp-text">読み込み中...</div>
+
+          <div class="label answer-row">
+            <span>英語</span>
+            <button id="toggleAnswerBtn" class="ghost small-btn">答えを見る</button>
+          </div>
+          <div id="enText" class="en-text hidden-text">*****</div>
+
+          <div class="label">解説</div>
+          <div id="exText" class="ex-text">解説はここに表示されます。</div>
+        </div>
+
+        <div class="card timer-card">
+          <div class="timer-title">カウントダウン</div>
+          <div id="countdownNumber" class="countdown-number">-</div>
+          <div id="countdownLabel" class="countdown-label">待機中</div>
+        </div>
+
+        <div class="card controls-card">
+          <div class="control-grid">
+            <button id="playBtn" class="primary">再生</button>
+            <button id="pauseBtn">一時停止</button>
+            <button id="prevBtn">前へ</button>
+            <button id="nextBtn">次へ</button>
+            <button id="replayJpBtn">日本語をもう一度</button>
+            <button id="retryBtn">今の問題をやり直す</button>
+          </div>
+        </div>
+
+        <div class="card notes-card">
+          <div class="small-note">CSV形式は jp,en,ex です。画面下の設定からCSVを読み込めます。</div>
+          <div class="small-note">音声はブラウザ内蔵の読み上げを使います。最初に再生ボタンを押して開始してください。</div>
+        </div>
+      </section>
+
+      <section id="screenList" class="screen">
+        <div class="card">
+          <div class="row wrap gap">
+            <input id="searchInput" type="text" placeholder="日本語・英語で検索" class="text-input" />
+            <button id="clearSearchBtn">検索解除</button>
+          </div>
+        </div>
+        <div id="problemList" class="list"></div>
+      </section>
+
+      <section id="screenSettings" class="screen">
+        <div class="card">
+          <h2>音声と再生</h2>
+          <div class="settings-grid">
+            <label><span>日本語を読む</span><input id="readJp" type="checkbox" /></label>
+            <label><span>英語を読む</span><input id="readEn" type="checkbox" /></label>
+            <label><span>日本語回数</span><input id="jpRepeat" type="number" min="1" max="5" /></label>
+            <label><span>考える時間（秒）</span><input id="thinkingSec" type="number" min="0" max="60" /></label>
+            <label><span>発話時間（秒）</span><input id="speakingSec" type="number" min="0" max="60" /></label>
+            <label><span>英語回数</span><input id="enRepeat" type="number" min="1" max="10" /></label>
+            <label><span>英語間隔（秒）</span><input id="enGapSec" type="number" min="0" max="10" step="0.5" /></label>
+            <label><span>次の問題まで（秒）</span><input id="nextDelaySec" type="number" min="0" max="30" step="0.5" /></label>
+            <label><span>音声速度</span><input id="speechRate" type="number" min="0.5" max="1.5" step="0.1" /></label>
+            <label><span>自動再生</span><input id="autoPlay" type="checkbox" /></label>
+            <label><span>ランダム再生</span><input id="randomMode" type="checkbox" /></label>
+            <label><span>全体リピート</span><input id="repeatMode" type="checkbox" /></label>
+            <label><span>最初は英語を隠す</span><input id="hideEnglishInitially" type="checkbox" /></label>
+            <label><span>解説を表示する</span><input id="showExplanation" type="checkbox" /></label>
+            <label><span>画面オフ時も継続を試みる</span><input id="backgroundMode" type="checkbox" /></label>
+          </div>
+          <div class="row gap top-space">
+            <button id="saveSettingsBtn" class="primary">設定を保存</button>
+            <button id="resetSettingsBtn">初期値に戻す</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>CSV読み込み</h2>
+          <div class="small-note">形式: 1行目に jp,en,ex を入れてください。</div>
+          <div class="row gap wrap top-space">
+            <input id="csvFileInput" type="file" accept=".csv,text/csv" />
+            <button id="loadSampleBtn">内蔵サンプルを読み込む</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>使い方の補足</h2>
+          <div class="small-note">iPhoneではホーム画面に追加するとアプリに近い形で使えます。</div>
+          <div class="small-note">バックグラウンド再生はブラウザの制限を受けるため、端末やOSによって動作差があります。</div>
+          <div class="small-note">より安定させたい場合は、将来 mp3 音声ファイル再生に拡張できます。</div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
