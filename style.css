@@ -51,6 +51,24 @@ button.ghost { background: transparent; }
 .list-item-jp { font-size: 18px; line-height: 1.6; margin-bottom: 8px; }
 .list-item-en { font-size: 14px; color: #4b5f79; }
 .small-note { font-size: 14px; line-height: 1.7; color: #4b5f79; }
+.dataset-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+.dataset-btn {
+  border: 1px solid #cdd8ea; background: #fff; color: #18212f;
+  border-radius: 999px; padding: 8px 12px; font-size: 14px; cursor: pointer;
+}
+.dataset-btn.active { background: #2563eb; color: white; border-color: #2563eb; }
+.dataset-manager { display: grid; gap: 10px; }
+.dataset-row {
+  display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between;
+  padding: 12px; border-radius: 14px; background: #f7faff;
+}
+.dataset-meta { display: grid; gap: 4px; }
+.dataset-name { font-weight: 700; }
+.dataset-sub { font-size: 13px; color: #4b5f79; }
+.danger-btn {
+  border: 1px solid #efb4b4; background: #fff6f6; color: #9f1d1d;
+  border-radius: 12px; padding: 8px 12px; cursor: pointer;
+}
 @media (max-width: 720px) {
   .app { padding: 12px; }
   h1 { font-size: 22px; }

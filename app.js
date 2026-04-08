@@ -17,14 +17,16 @@ const DEFAULT_SETTINGS = {
 };
 
 const SAMPLE_CSV_URL = 'problems.csv';
+const SAMPLE_DATASET_ID = 'sample_builtin';
 
+let settings = loadSettings();
+let datasetStore = loadDatasetStore();
+let activeDatasetId = loadActiveDatasetId();
 let problems = [];
 let displayOrder = [];
 let currentOrderIndex = 0;
-let settings = loadSettings();
 let isPlaying = false;
 let isPaused = false;
-let currentPhase = '停止中';
 let revealed = false;
 let activeTimeout = null;
 let countdownInterval = null;
@@ -37,6 +39,9 @@ const els = {
   tabPractice: document.getElementById('tabPractice'),
   tabList: document.getElementById('tabList'),
   tabSettings: document.getElementById('tabSettings'),
+  datasetButtonsPractice: document.getElementById('datasetButtonsPractice'),
+  datasetButtonsList: document.getElementById('datasetButtonsList'),
+  datasetManager: document.getElementById('datasetManager'),
   progressText: document.getElementById('progressText'),
   progressBar: document.getElementById('progressBar'),
   phaseBadge: document.getElementById('phaseBadge'),
@@ -89,6 +94,27 @@ function saveSettings() {
   localStorage.setItem('waei_settings', JSON.stringify(settings));
 }
 
+function loadDatasetStore() {
+  try {
+    const saved = JSON.parse(localStorage.getItem('waei_dataset_store') || '{}');
+    return saved && typeof saved === 'object' ? saved : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveDatasetStore() {
+  localStorage.setItem('waei_dataset_store', JSON.stringify(datasetStore));
+}
+
+function loadActiveDatasetId() {
+  return localStorage.getItem('waei_active_dataset_id') || SAMPLE_DATASET_ID;
+}
+
+function saveActiveDatasetId() {
+  localStorage.setItem('waei_active_dataset_id', activeDatasetId);
+}
+
 function applySettingsToForm() {
   Object.keys(DEFAULT_SETTINGS).forEach(key => {
     if (!els[key]) return;
@@ -120,6 +146,7 @@ function readSettingsFromForm() {
   };
   saveSettings();
   applySettingsToForm();
+  buildDisplayOrder();
   renderCurrentProblem();
 }
 
@@ -187,6 +214,87 @@ function csvToProblems(text) {
   }).filter(p => p.jp || p.en);
 }
 
+function datasetDisplayName(ds) {
+  return ds?.name || '無題';
+}
+
+function setActiveDataset(id) {
+  if (!datasetStore[id]) return;
+  stopPlayback();
+  activeDatasetId = id;
+  saveActiveDatasetId();
+  problems = datasetStore[id].problems || [];
+  currentOrderIndex = 0;
+  buildDisplayOrder();
+  renderDatasetButtons();
+  renderDatasetManager();
+  renderCurrentProblem();
+  renderList(els.searchInput ? els.searchInput.value : '');
+}
+
+function addDataset(name, problemsArray) {
+  const id = 'ds_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+  datasetStore[id] = {
+    id,
+    name,
+    problems: problemsArray,
+    createdAt: new Date().toISOString()
+  };
+  saveDatasetStore();
+  setActiveDataset(id);
+}
+
+function deleteDataset(id) {
+  if (id === SAMPLE_DATASET_ID) {
+    alert('内蔵サンプルは削除できません。');
+    return;
+  }
+  if (!datasetStore[id]) return;
+  delete datasetStore[id];
+  saveDatasetStore();
+  if (activeDatasetId === id) {
+    setActiveDataset(SAMPLE_DATASET_ID);
+  } else {
+    renderDatasetButtons();
+    renderDatasetManager();
+  }
+}
+
+function renderDatasetButtons() {
+  [els.datasetButtonsPractice, els.datasetButtonsList].forEach(container => {
+    if (!container) return;
+    container.innerHTML = '';
+    Object.values(datasetStore).forEach(ds => {
+      const btn = document.createElement('button');
+      btn.className = 'dataset-btn' + (ds.id === activeDatasetId ? ' active' : '');
+      btn.textContent = `${datasetDisplayName(ds)} (${(ds.problems || []).length})`;
+      btn.addEventListener('click', () => setActiveDataset(ds.id));
+      container.appendChild(btn);
+    });
+  });
+}
+
+function renderDatasetManager() {
+  if (!els.datasetManager) return;
+  els.datasetManager.innerHTML = '';
+  Object.values(datasetStore).forEach(ds => {
+    const row = document.createElement('div');
+    row.className = 'dataset-row';
+    const sub = ds.id === SAMPLE_DATASET_ID ? '内蔵サンプル' : `問題数: ${(ds.problems || []).length}`;
+    row.innerHTML = `
+      <div class="dataset-meta">
+        <div class="dataset-name">${escapeHtml(datasetDisplayName(ds))}</div>
+        <div class="dataset-sub">${escapeHtml(sub)}</div>
+      </div>
+      <div class="row gap wrap">
+        <button data-activate="${ds.id}" class="${ds.id === activeDatasetId ? 'primary' : ''}">この問題集を使う</button>
+        ${ds.id === SAMPLE_DATASET_ID ? '' : `<button data-delete="${ds.id}" class="danger-btn">削除</button>`}
+      </div>
+    `;
+    els.datasetManager.appendChild(row);
+  });
+}
+
 function buildDisplayOrder() {
   displayOrder = problems.map((_, i) => i);
   if (settings.randomMode) {
@@ -205,14 +313,13 @@ function currentProblem() {
 }
 
 function updatePhase(label) {
-  currentPhase = label;
   els.phaseBadge.textContent = label;
 }
 
 function renderCurrentProblem() {
   const p = currentProblem();
   if (!p) {
-    els.jpText.textContent = '問題がありません。設定画面からCSVを読み込んでください。';
+    els.jpText.textContent = '問題がありません。設定画面からCSVを追加してください。';
     els.enText.textContent = '';
     els.exText.textContent = '';
     els.progressText.textContent = '問題 0 / 0';
@@ -311,8 +418,6 @@ async function speak(text, langPrefix) {
   await new Promise(resolve => {
     const utter = new SpeechSynthesisUtterance(text);
     utter.rate = settings.speechRate;
-    utter.pitch = 1;
-    utter.volume = 1;
     const voice = getVoice(langPrefix);
     if (voice) utter.voice = voice;
     utter.lang = langPrefix === 'ja' ? 'ja-JP' : 'en-US';
@@ -442,43 +547,29 @@ function movePrevInternal() {
   return false;
 }
 
-function persistProblems() {
-  localStorage.setItem('waei_problems', JSON.stringify(problems));
-}
-
-function loadSavedProblems() {
-  try {
-    const saved = JSON.parse(localStorage.getItem('waei_problems') || '[]');
-    if (Array.isArray(saved) && saved.length) {
-      problems = saved;
-      buildDisplayOrder();
-      renderCurrentProblem();
-      renderList();
-      return true;
-    }
-  } catch {}
-  return false;
-}
-
-async function loadCsvFromText(text) {
-  const parsed = csvToProblems(text);
-  if (!parsed.length) {
-    alert('CSVを読み込めませんでした。1行目に jp,en,ex があるか確認してください。');
-    return;
-  }
-  stopPlayback();
-  problems = parsed;
-  persistProblems();
-  buildDisplayOrder();
-  renderCurrentProblem();
-  renderList();
-  switchTab('practice');
-}
-
-async function loadSample() {
+async function loadSampleDataset() {
   const res = await fetch(SAMPLE_CSV_URL);
   const text = await res.text();
-  await loadCsvFromText(text);
+  const parsed = csvToProblems(text);
+  datasetStore[SAMPLE_DATASET_ID] = {
+    id: SAMPLE_DATASET_ID,
+    name: '内蔵サンプル',
+    problems: parsed,
+    createdAt: new Date().toISOString()
+  };
+  saveDatasetStore();
+  if (!activeDatasetId || !datasetStore[activeDatasetId]) activeDatasetId = SAMPLE_DATASET_ID;
+  saveActiveDatasetId();
+}
+
+async function addCsvTextAsDataset(name, text) {
+  const parsed = csvToProblems(text);
+  if (!parsed.length) {
+    alert(`「${name}」を読み込めませんでした。1行目に jp,en,ex があるか確認してください。`);
+    return false;
+  }
+  addDataset(name.replace(/\.csv$/i, ''), parsed);
+  return true;
 }
 
 function bindEvents() {
@@ -488,7 +579,6 @@ function bindEvents() {
 
   els.playBtn.addEventListener('click', async () => {
     if (isPlaying) return;
-    if (!problems.length) await loadSample();
     readSettingsFromForm();
     await playSequence();
   });
@@ -543,23 +633,34 @@ function bindEvents() {
     if (status) {
       const [idx, value] = status.split(':');
       problems[Number(idx)].status = value;
-      persistProblems();
+      datasetStore[activeDatasetId].problems = problems;
+      saveDatasetStore();
       renderList(els.searchInput.value);
     }
   });
 
   els.csvFileInput.addEventListener('change', async (e) => {
-    const file = e.target.files && e.target.files[0];
-    if (!file) return;
-    const text = await file.text();
-    await loadCsvFromText(text);
+    const files = Array.from(e.target.files || []);
+    for (const file of files) {
+      const text = await file.text();
+      await addCsvTextAsDataset(file.name, text);
+    }
+    renderDatasetButtons();
+    renderDatasetManager();
+    renderCurrentProblem();
+    renderList();
+    els.csvFileInput.value = '';
   });
 
-  els.loadSampleBtn.addEventListener('click', async () => await loadSample());
+  els.loadSampleBtn.addEventListener('click', async () => {
+    activeDatasetId = SAMPLE_DATASET_ID;
+    saveActiveDatasetId();
+    setActiveDataset(SAMPLE_DATASET_ID);
+    switchTab('practice');
+  });
 
   els.saveSettingsBtn.addEventListener('click', () => {
     readSettingsFromForm();
-    if (settings.randomMode) buildDisplayOrder();
     alert('設定を保存しました。');
   });
 
@@ -570,6 +671,18 @@ function bindEvents() {
     buildDisplayOrder();
     renderCurrentProblem();
     alert('初期値に戻しました。');
+  });
+
+  els.datasetManager.addEventListener('click', (e) => {
+    const activate = e.target.getAttribute('data-activate');
+    const del = e.target.getAttribute('data-delete');
+    if (activate) {
+      setActiveDataset(activate);
+      switchTab('practice');
+    }
+    if (del) {
+      deleteDataset(del);
+    }
   });
 
   document.addEventListener('visibilitychange', async () => {
@@ -607,12 +720,18 @@ function bindEvents() {
 async function init() {
   applySettingsToForm();
   bindEvents();
-  const restored = loadSavedProblems();
-  if (!restored) {
-    await loadSample();
+  await loadSampleDataset();
+  if (!datasetStore[activeDatasetId]) {
+    activeDatasetId = SAMPLE_DATASET_ID;
+    saveActiveDatasetId();
   }
+  problems = datasetStore[activeDatasetId].problems || [];
+  buildDisplayOrder();
+  renderDatasetButtons();
+  renderDatasetManager();
+  renderCurrentProblem();
+  renderList();
   speechSynthesis.getVoices();
-  window.speechSynthesis.onvoiceschanged = () => {};
 }
 
 init();

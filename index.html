@@ -21,6 +21,11 @@
 
     <main>
       <section id="screenPractice" class="screen active">
+        <div class="card">
+          <div class="label">問題集</div>
+          <div id="datasetButtonsPractice" class="dataset-buttons"></div>
+        </div>
+
         <div class="card progress-card">
           <div class="row space-between">
             <div id="progressText">問題 1 / 1</div>
@@ -63,12 +68,16 @@
         </div>
 
         <div class="card notes-card">
-          <div class="small-note">CSV形式は jp,en,ex です。画面下の設定からCSVを読み込めます。</div>
-          <div class="small-note">音声はブラウザ内蔵の読み上げを使います。最初に再生ボタンを押して開始してください。</div>
+          <div class="small-note">CSV形式は jp,en,ex です。設定画面から複数のCSVを追加できます。</div>
+          <div class="small-note">追加したCSVは問題集として保存され、ボタン1つで切り替えられます。</div>
         </div>
       </section>
 
       <section id="screenList" class="screen">
+        <div class="card">
+          <div class="label">問題集</div>
+          <div id="datasetButtonsList" class="dataset-buttons"></div>
+        </div>
         <div class="card">
           <div class="row wrap gap">
             <input id="searchInput" type="text" placeholder="日本語・英語で検索" class="text-input" />
@@ -105,19 +114,13 @@
         </div>
 
         <div class="card">
-          <h2>CSV読み込み</h2>
-          <div class="small-note">形式: 1行目に jp,en,ex を入れてください。</div>
+          <h2>問題集の管理</h2>
+          <div class="small-note">CSVを追加すると、問題集として保存されます。以後はボタン1つで切り替えられます。</div>
           <div class="row gap wrap top-space">
-            <input id="csvFileInput" type="file" accept=".csv,text/csv" />
-            <button id="loadSampleBtn">内蔵サンプルを読み込む</button>
+            <input id="csvFileInput" type="file" accept=".csv,text/csv" multiple />
+            <button id="loadSampleBtn">内蔵サンプルを使う</button>
           </div>
-        </div>
-
-        <div class="card">
-          <h2>使い方の補足</h2>
-          <div class="small-note">iPhoneではホーム画面に追加するとアプリに近い形で使えます。</div>
-          <div class="small-note">バックグラウンド再生はブラウザの制限を受けるため、端末やOSによって動作差があります。</div>
-          <div class="small-note">より安定させたい場合は、将来 mp3 音声ファイル再生に拡張できます。</div>
+          <div id="datasetManager" class="dataset-manager top-space"></div>
         </div>
       </section>
     </main>
