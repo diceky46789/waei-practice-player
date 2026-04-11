@@ -4,14 +4,14 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="theme-color" content="#2563eb" />
-  <title>和英練習プレイヤー 音声CSV版 コンパクト</title>
+  <title>和英練習プレイヤー 音声CSV版 コンパクト2</title>
   <link rel="manifest" href="manifest.json" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <div class="app">
     <header class="topbar">
-      <h1>和英練習プレイヤー 音声CSV版 コンパクト</h1>
+      <h1>和英練習プレイヤー 音声CSV版 コンパクト2</h1>
       <div class="top-actions">
         <button id="tabPractice" class="tab-btn active">練習</button>
         <button id="tabList" class="tab-btn">問題一覧</button>
@@ -54,6 +54,7 @@
             <div id="enAudioStatus" class="small-note">英語音声: -</div>
           </div>
         </div>
+
 
         <div class="card controls-card">
           <div class="control-grid">
