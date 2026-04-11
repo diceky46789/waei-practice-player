@@ -1,31 +1,9 @@
-const CACHE_NAME = 'waei-player-v3';
-const ASSETS = [
-  './',
-  './index.html',
-  './style.css',
-  './app.js',
-  './manifest.json',
-  './problems.csv',
-  './icons/icon-192.png',
-  './icons/icon-512.png'
-];
+和英練習プレイヤー v3 音声CSV版
+CSV列: jp,en,ex,jpAudio,enAudio
+設定画面でCSVと音声ファイル(mp3/m4a/wav等)を一緒に読み込んでください。
+CSVの jpAudio / enAudio には音声ファイル名を入れてください。
+例: jp001.mp3 / en001.mp3
 
-self.addEventListener('install', event => {
-  event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS)));
-  self.skipWaiting();
-});
+設定タブに「各問題の自動リピート回数」を追加した修正版です。
 
-self.addEventListener('activate', event => {
-  event.waitUntil(
-    caches.keys().then(keys => Promise.all(
-      keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k))
-    ))
-  );
-  self.clients.claim();
-});
-
-self.addEventListener('fetch', event => {
-  event.respondWith(
-    caches.match(event.request).then(res => res || fetch(event.request))
-  );
-});
+コンパクト版: カウントダウン表示をなくし、前へ・次へボタンまで1画面に収まりやすいように余白と文字サイズを調整しました。

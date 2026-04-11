@@ -1,79 +1,31 @@
-* { box-sizing: border-box; }
-html, body { margin: 0; padding: 0; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f3f6fb; color: #18212f; }
-body { min-height: 100vh; }
-.app { max-width: 940px; margin: 0 auto; padding: 16px; }
-.topbar { position: sticky; top: 0; z-index: 10; background: #f3f6fb; padding-bottom: 8px; }
-h1 { margin: 0 0 12px; font-size: 28px; }
-h2 { margin-top: 0; font-size: 20px; }
-.top-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-.tab-btn, button, input[type="file"]::file-selector-button {
-  border: 1px solid #cdd8ea; background: #fff; color: #18212f;
-  border-radius: 14px; padding: 10px 14px; font-size: 15px; cursor: pointer;
-}
-button.primary, .tab-btn.active {
-  background: #2563eb; color: white; border-color: #2563eb;
-}
-button.ghost { background: transparent; }
-.small-btn { padding: 6px 10px; font-size: 13px; }
-.card {
-  background: #fff; border-radius: 20px; box-shadow: 0 8px 24px rgba(26, 45, 74, 0.08);
-  padding: 18px; margin-bottom: 16px;
-}
-.row { display: flex; align-items: center; }
-.wrap { flex-wrap: wrap; }
-.gap { gap: 10px; }
-.space-between { justify-content: space-between; }
-.top-space { margin-top: 14px; }
-.screen { display: none; }
-.screen.active { display: block; }
-.progress-wrap { margin-top: 10px; width: 100%; height: 12px; background: #e5edf9; border-radius: 999px; overflow: hidden; }
-.progress-bar { height: 100%; width: 0%; background: #2563eb; transition: width 0.3s ease; }
-.badge { padding: 6px 10px; border-radius: 999px; background: #e8f0ff; color: #2563eb; font-size: 13px; font-weight: 600; }
-.label { font-size: 13px; color: #50627d; margin-bottom: 8px; }
-.answer-row { display: flex; justify-content: space-between; align-items: center; margin-top: 16px; }
-.jp-text, .en-text {
-  font-size: 28px; line-height: 1.5; word-break: break-word; min-height: 84px;
-}
-.ex-text { font-size: 15px; line-height: 1.7; color: #36485f; min-height: 48px; }
-.hidden-text { letter-spacing: 0.12em; color: #7a8ea8; }
-.timer-card { text-align: center; }
-.timer-title { font-size: 14px; color: #50627d; }
-.countdown-number { font-size: 64px; font-weight: 700; margin-top: 8px; }
-.countdown-label { font-size: 18px; margin-top: 6px; color: #2563eb; font-weight: 700; }
-.control-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-.settings-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 18px; }
-.settings-grid label { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 12px; background: #f7faff; border-radius: 14px; }
-.settings-grid input[type="number"] { width: 100px; padding: 8px; border-radius: 10px; border: 1px solid #cdd8ea; }
-.text-input { flex: 1; min-width: 220px; padding: 12px 14px; border: 1px solid #cdd8ea; border-radius: 14px; font-size: 15px; }
-.list { display: grid; gap: 12px; }
-.list-item { padding: 14px; border-radius: 16px; background: #fff; box-shadow: 0 6px 18px rgba(26, 45, 74, 0.06); }
-.list-item-header { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
-.list-item-jp { font-size: 18px; line-height: 1.6; margin-bottom: 8px; }
-.list-item-en { font-size: 14px; color: #4b5f79; }
-.small-note { font-size: 14px; line-height: 1.7; color: #4b5f79; }
-.dataset-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
-.dataset-btn {
-  border: 1px solid #cdd8ea; background: #fff; color: #18212f;
-  border-radius: 999px; padding: 8px 12px; font-size: 14px; cursor: pointer;
-}
-.dataset-btn.active { background: #2563eb; color: white; border-color: #2563eb; }
-.dataset-manager { display: grid; gap: 10px; }
-.dataset-row {
-  display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between;
-  padding: 12px; border-radius: 14px; background: #f7faff;
-}
-.dataset-meta { display: grid; gap: 4px; }
-.dataset-name { font-weight: 700; }
-.dataset-sub { font-size: 13px; color: #4b5f79; }
-.danger-btn {
-  border: 1px solid #efb4b4; background: #fff6f6; color: #9f1d1d;
-  border-radius: 12px; padding: 8px 12px; cursor: pointer;
-}
-.audio-status-wrap { display: grid; gap: 4px; margin-top: 10px; }
-@media (max-width: 720px) {
-  .app { padding: 12px; }
-  h1 { font-size: 22px; }
-  .jp-text, .en-text { font-size: 22px; min-height: 72px; }
-  .countdown-number { font-size: 52px; }
-  .settings-grid, .control-grid { grid-template-columns: 1fr; }
-}
+const CACHE_NAME = 'waei-player-v3';
+const ASSETS = [
+  './',
+  './index.html',
+  './style.css',
+  './app.js',
+  './manifest.json',
+  './problems.csv',
+  './icons/icon-192.png',
+  './icons/icon-512.png'
+];
+
+self.addEventListener('install', event => {
+  event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS)));
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', event => {
+  event.waitUntil(
+    caches.keys().then(keys => Promise.all(
+      keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k))
+    ))
+  );
+  self.clients.claim();
+});
+
+self.addEventListener('fetch', event => {
+  event.respondWith(
+    caches.match(event.request).then(res => res || fetch(event.request))
+  );
+});

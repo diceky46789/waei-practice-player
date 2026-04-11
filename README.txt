@@ -1,7 +1,4 @@
-和英練習プレイヤー v3 音声CSV版
-CSV列: jp,en,ex,jpAudio,enAudio
-設定画面でCSVと音声ファイル(mp3/m4a/wav等)を一緒に読み込んでください。
-CSVの jpAudio / enAudio には音声ファイル名を入れてください。
-例: jp001.mp3 / en001.mp3
-
-設定タブに「各問題の自動リピート回数」を追加した修正版です。
+﻿jp,en,ex,jpAudio,enAudio
+私は明日また来てくださいと患者さんに伝えました。,I told the patient to come again tomorrow.,tell 人 to do の形です。,,
+この傷は時間とともに目立ちにくくなります。,This scar will become less noticeable with time.,will become と with time が大切です。,,
+赤みや痛みが強くなったら、すぐに来てください。,"If the redness or pain gets worse, please come back right away.",If 節では gets を使います。,,

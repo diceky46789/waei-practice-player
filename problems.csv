@@ -1,4 +1,20 @@
-﻿jp,en,ex,jpAudio,enAudio
-私は明日また来てくださいと患者さんに伝えました。,I told the patient to come again tomorrow.,tell 人 to do の形です。,,
-この傷は時間とともに目立ちにくくなります。,This scar will become less noticeable with time.,will become と with time が大切です。,,
-赤みや痛みが強くなったら、すぐに来てください。,"If the redness or pain gets worse, please come back right away.",If 節では gets を使います。,,
+{
+  "name": "和英練習プレイヤー 音声CSV版",
+  "short_name": "和英音声CSV",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#f3f6fb",
+  "theme_color": "#2563eb",
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
