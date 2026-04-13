@@ -79,13 +79,13 @@ button.ghost { background: transparent; }
 }
 
 
-/* compact2 layout */
+/* no countdown compact */
 .app { max-width: 900px; padding: 8px; }
 h1 { margin: 0 0 8px; font-size: 20px; }
 .topbar { padding-bottom: 4px; }
 .card { padding: 10px; margin-bottom: 8px; border-radius: 14px; }
 .label { margin-bottom: 4px; font-size: 12px; }
-.jp-text, .en-text { font-size: 18px; min-height: 42px; line-height: 1.35; }
+.jp-text, .en-text { font-size: 18px; min-height: 40px; line-height: 1.35; }
 .ex-text { font-size: 12px; min-height: 24px; line-height: 1.4; }
 .audio-status-wrap { margin-top: 4px; gap: 2px; }
 .progress-wrap { margin-top: 4px; height: 8px; }
@@ -94,13 +94,13 @@ button, .tab-btn, input[type="file"]::file-selector-button { padding: 7px 9px; f
 .small-note { font-size: 12px; line-height: 1.4; }
 .settings-grid label { padding: 8px 10px; }
 .settings-grid input[type="number"] { width: 78px; padding: 5px; }
-.timer-card, .timer-title, .countdown-number, .countdown-label { display: none !important; }
+.timer-card, .timer-title, .countdown-number, .countdown-label, #countdownNumber, #countdownLabel { display: none !important; }
 
 @media (max-width: 720px) {
   .app { padding: 6px; }
   h1 { font-size: 18px; }
   .card { padding: 8px; margin-bottom: 6px; }
-  .jp-text, .en-text { font-size: 17px; min-height: 38px; }
+  .jp-text, .en-text { font-size: 17px; min-height: 36px; }
   .ex-text { font-size: 11px; min-height: 20px; }
   .control-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; }
   button, .tab-btn, input[type="file"]::file-selector-button { padding: 6px 7px; font-size: 12px; }
